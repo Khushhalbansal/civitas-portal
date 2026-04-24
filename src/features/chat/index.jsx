@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import DOMPurify from 'dompurify';
 import { generateGeminiResponse } from '../../services/geminiService';
+import { logAnalyticsEvent } from '../../services/firebase/firebaseConfig';
 
 export const ChatInterface = ({ aiMessage = '' }) => {
   const [messages, setMessages] = useState([
@@ -29,10 +30,12 @@ export const ChatInterface = ({ aiMessage = '' }) => {
       const response = await generateGeminiResponse(prompt);
       
       setMessages(prev => [...prev, { role: 'assistant', text: response }]);
+      logAnalyticsEvent('ai_chat_message', { status: 'success' });
     } catch (err) {
       console.error('[ChatInterface] Error sending message:', err);
       setError(err.message || 'An error occurred while generating a response.');
       setMessages(prev => [...prev, { role: 'assistant', text: '<p class="text-rose-600">Sorry, I encountered an error. Please try again later.</p>' }]);
+      logAnalyticsEvent('ai_chat_message', { status: 'error' });
     } finally {
       setIsLoading(false);
     }
