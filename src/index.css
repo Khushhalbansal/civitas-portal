@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  --color-civitas-blue: #004A99;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  @apply bg-slate-50 text-slate-800 antialiased;
+}
