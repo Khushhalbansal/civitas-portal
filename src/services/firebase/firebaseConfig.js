@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInAnonymously } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 import { getAnalytics, logEvent, isSupported } from "firebase/analytics";
 import { getPerformance } from "firebase/performance";
 
@@ -27,6 +28,9 @@ export const googleProvider = new GoogleAuthProvider();
 
 // Firebase Cloud Firestore — NoSQL document database for interaction telemetry
 export const db = getFirestore(app);
+
+// Firebase Cloud Storage — for secure document uploads (Zero-PII)
+export const storage = getStorage(app);
 
 // Firebase Performance Monitoring — auto-tracks page load, network latency, and custom traces
 let perf = null;

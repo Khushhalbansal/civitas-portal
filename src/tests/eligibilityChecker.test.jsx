@@ -74,7 +74,7 @@ describe('EligibilityChecker Component', () => {
   describe('Edge Cases Validation', () => {
     let alertMock;
     beforeEach(() => {
-      alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      alertMock = vi.spyOn(window, 'alert').mockImplementation(() => { });
     });
     afterEach(() => {
       alertMock.mockRestore();

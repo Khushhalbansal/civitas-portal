@@ -4,6 +4,7 @@ import { fetchVoterInfo } from '../../services/google/googleCivicAPI';
 import { logAnalyticsEvent } from '../../services/firebase/firebaseConfig';
 import { getInteractionCount } from '../../services/firebase/interactionService';
 import { getUserLocation, reverseGeocode, buildGoogleMapsEmbedUrl } from '../../services/geolocationService';
+import { DocumentUpload } from './DocumentUpload';
 
 /** Default fallback for Jaipur */
 const DEFAULT_COORDS = { lat: 26.9124, lng: 75.7873 };
@@ -223,6 +224,9 @@ export const VotingProcess = ({ language, dynamicFaqAnswer = '' }) => {
               )}
             </ul>
           </section>
+
+          {/* Document Upload for Firebase Storage integration */}
+          <DocumentUpload language={language} />
         </div>
       </div>
     </div>

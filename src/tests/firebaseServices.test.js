@@ -29,6 +29,13 @@ vi.mock('firebase/analytics', () => ({
   isSupported: vi.fn().mockResolvedValue(true),
 }));
 
+vi.mock('firebase/storage', () => ({
+  getStorage: vi.fn(() => ({})),
+  ref: vi.fn(),
+  uploadBytesResumable: vi.fn(),
+  getDownloadURL: vi.fn()
+}));
+
 vi.mock('firebase/performance', () => ({
   getPerformance: vi.fn(() => ({})),
 }));

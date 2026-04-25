@@ -23,11 +23,12 @@ export const getUserLocation = () => {
           city: '' // City name will be resolved via reverse geocoding
         });
       },
-      () => {
+      (error) => {
         // Permission denied or error — use fallback
+        console.warn('[Geolocation] Denied or error:', error.message);
         resolve(fallback);
       },
-      { timeout: 5000, maximumAge: 300000 }
+      { timeout: 15000, maximumAge: 300000, enableHighAccuracy: false }
     );
   });
 };
