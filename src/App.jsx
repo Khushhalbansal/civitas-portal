@@ -49,9 +49,7 @@ const NavLink = ({ to, children }) => {
 const AuthButton = () => {
   const { currentUser, loginWithGoogle, logout, isAnonymous } = useAuth();
 
-  if (!currentUser) return null;
-
-  if (isAnonymous) {
+  if (!currentUser || isAnonymous) {
     return (
       <button
         onClick={loginWithGoogle}
