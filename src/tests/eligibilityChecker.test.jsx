@@ -65,4 +65,60 @@ describe('EligibilityChecker Component', () => {
     const locationLabel = screen.getByText('Location');
     expect(locationLabel).toHaveAttribute('for', 'location-input');
   });
+
+  describe('Edge Cases Validation', () => {
+    let alertMock;
+    beforeEach(() => {
+      alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      alertMock.mockRestore();
+    });
+
+    it('should show alert if age is empty', () => {
+      renderComponent();
+      fireEvent.click(screen.getByRole('button', { name: /verify eligibility/i }));
+      expect(alertMock).toHaveBeenCalledWith('Please enter a valid numeric age.');
+    });
+
+    it('should show alert if age is abc', () => {
+      renderComponent();
+      const ageInput = screen.getByLabelText(/age/i);
+      fireEvent.change(ageInput, { target: { value: 'abc' } });
+      fireEvent.click(screen.getByRole('button', { name: /verify eligibility/i }));
+      expect(alertMock).toHaveBeenCalledWith('Please enter a valid numeric age.');
+    });
+
+    it('should show alert if age is 0', () => {
+      renderComponent();
+      const ageInput = screen.getByLabelText(/age/i);
+      fireEvent.change(ageInput, { target: { value: '0' } });
+      fireEvent.click(screen.getByRole('button', { name: /verify eligibility/i }));
+      expect(alertMock).toHaveBeenCalledWith('Please enter a valid age between 1 and 120.');
+    });
+
+    it('should show alert if age is 121', () => {
+      renderComponent();
+      const ageInput = screen.getByLabelText(/age/i);
+      fireEvent.change(ageInput, { target: { value: '121' } });
+      fireEvent.click(screen.getByRole('button', { name: /verify eligibility/i }));
+      expect(alertMock).toHaveBeenCalledWith('Please enter a valid age between 1 and 120.');
+    });
+
+    it('should show eligible message for age exactly 18', () => {
+      renderComponent();
+      const ageInput = screen.getByLabelText(/age/i);
+      fireEvent.change(ageInput, { target: { value: '18' } });
+      fireEvent.click(screen.getByRole('button', { name: /verify eligibility/i }));
+      expect(screen.getByText('You are eligible to vote.')).toBeInTheDocument();
+    });
+
+    it('should show eligible message for age exactly 120', () => {
+      renderComponent();
+      const ageInput = screen.getByLabelText(/age/i);
+      fireEvent.change(ageInput, { target: { value: '120' } });
+      fireEvent.click(screen.getByRole('button', { name: /verify eligibility/i }));
+      expect(screen.getByText('You are eligible to vote.')).toBeInTheDocument();
+    });
+  });
 });
