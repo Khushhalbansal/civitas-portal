@@ -1,5 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
-import React from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { EligibilityChecker } from '../features/eligibility';
 import { MemoryRouter } from 'react-router-dom';

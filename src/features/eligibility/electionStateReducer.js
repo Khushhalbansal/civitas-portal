@@ -35,12 +35,9 @@ export const electionStateReducer = (state, action) => {
       const isEligible = age >= 18;
       const lang = state.language;
       
-      let message = '';
-      if (isEligible) {
-        message = lang === 'en' ? 'You are eligible to vote.' : 'आप वोट देने के पात्र हैं।';
-      } else {
-        message = lang === 'en' ? 'You must be 18 or older to vote.' : 'वोट देने के लिए आपकी आयु 18 वर्ष या उससे अधिक होनी चाहिए।';
-      }
+      const message = isEligible 
+        ? (lang === 'en' ? 'You are eligible to vote.' : 'आप वोट देने के पात्र हैं।')
+        : (lang === 'en' ? 'You must be 18 or older to vote.' : 'वोट देने के लिए आपकी आयु 18 वर्ष या उससे अधिक होनी चाहिए।');
 
       return {
         ...state,

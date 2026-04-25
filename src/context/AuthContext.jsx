@@ -12,6 +12,7 @@ const AuthContext = createContext();
  * Hook to access the AuthContext.
  * @returns {{ currentUser: object|null, loading: boolean, loginWithGoogle: Function, logout: Function, isAnonymous: boolean }}
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   return useContext(AuthContext);
 };

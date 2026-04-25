@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import DOMPurify from 'dompurify';
 import { fetchVoterInfo } from '../../services/google/googleCivicAPI';
 import { logAnalyticsEvent } from '../../services/firebase/firebaseConfig';
@@ -27,47 +27,53 @@ export const VotingProcess = ({ language, dynamicFaqAnswer = '' }) => {
 
   const sanitizedFaqAnswer = DOMPurify.sanitize(dynamicFaqAnswer);
 
-  // Step 1: Detect user location and set up Google Maps
+  const detectLocation = async () => {
+    setLocationStatus('detecting');
+    const loc = await getUserLocation();
+
+    // Build the dynamic Google Maps URL centered on user's position
+    setMapUrl(buildGoogleMapsEmbedUrl(loc.lat, loc.lng));
+
+    // Reverse geocode to get city name
+    let city = loc.city;
+    if (!city) {
+      city = await reverseGeocode(loc.lat, loc.lng);
+    }
+
+    setDetectedCity(city);
+    setLocationStatus(city === 'Jaipur' && loc.lat === DEFAULT_COORDS.lat ? 'denied' : 'granted');
+
+    logAnalyticsEvent('location_detected', { city: city, status: 'success' });
+
+    // Step 2: Fetch civic info for the detected city
+    setLoadingCivic(true);
+    try {
+      const info = await fetchVoterInfo(city);
+      setCivicInfo(info);
+      logAnalyticsEvent('civic_info_loaded', { location: city, status: 'success' });
+    } catch (error) {
+      console.error('[VotingProcess] Failed to load civic info:', error);
+      logAnalyticsEvent('civic_info_loaded', { location: city, status: 'error' });
+    } finally {
+      setLoadingCivic(false);
+    }
+  };
+
+  // Step 1: Default to Jaipur on mount
   useEffect(() => {
     let cancelled = false;
-    const detectLocation = async () => {
-      setLocationStatus('detecting');
-      const loc = await getUserLocation();
-
-      if (cancelled) return;
-
-      // Build the dynamic Google Maps URL centered on user's position
-      setMapUrl(buildGoogleMapsEmbedUrl(loc.lat, loc.lng));
-
-      // Reverse geocode to get city name
-      let city = loc.city;
-      if (!city) {
-        city = await reverseGeocode(loc.lat, loc.lng);
-      }
-
-      if (cancelled) return;
-      setDetectedCity(city);
-      setLocationStatus(city === 'Jaipur' && loc.lat === DEFAULT_COORDS.lat ? 'denied' : 'granted');
-
-      logAnalyticsEvent('location_detected', { city: city, status: 'success' });
-
-      // Step 2: Fetch civic info for the detected city
+    const loadDefault = async () => {
       setLoadingCivic(true);
       try {
-        const info = await fetchVoterInfo(city);
-        if (!cancelled) {
-          setCivicInfo(info);
-          logAnalyticsEvent('civic_info_loaded', { location: city, status: 'success' });
-        }
-      } catch (error) {
-        console.error('[VotingProcess] Failed to load civic info:', error);
-        logAnalyticsEvent('civic_info_loaded', { location: city, status: 'error' });
+        const info = await fetchVoterInfo('Jaipur');
+        if (!cancelled) setCivicInfo(info);
+      } catch (e) {
+        console.error(e);
       } finally {
         if (!cancelled) setLoadingCivic(false);
       }
     };
-
-    detectLocation();
+    loadDefault();
     return () => { cancelled = true; };
   }, []);
 
@@ -114,24 +120,47 @@ export const VotingProcess = ({ language, dynamicFaqAnswer = '' }) => {
             </div>
           )}
 
-          {/* Location Status Badge */}
-          {detectedCity && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className={`flex h-2 w-2 rounded-full ${locationStatus === 'granted' ? 'bg-emerald-500' : 'bg-amber-500'}`} aria-hidden="true" />
-              <span className="text-slate-600">
-                {locationStatus === 'granted'
-                  ? (language === 'hi' ? `📍 स्थान पता चला: ${detectedCity}` : `📍 Location detected: ${detectedCity}`)
-                  : (language === 'hi' ? `📍 डिफ़ॉल्ट स्थान: ${detectedCity}` : `📍 Default location: ${detectedCity}`)}
-              </span>
+          {/* Location Status & Trigger Button */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <div>
+              {detectedCity ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className={`flex h-2 w-2 rounded-full ${locationStatus === 'granted' ? 'bg-emerald-500' : 'bg-amber-500'}`} aria-hidden="true" />
+                  <span className="text-slate-600 font-medium">
+                    {locationStatus === 'granted'
+                      ? (language === 'hi' ? `स्थान पता चला: ${detectedCity}` : `Location detected: ${detectedCity}`)
+                      : (language === 'hi' ? `डिफ़ॉल्ट स्थान: ${detectedCity}` : `Default location: ${detectedCity}`)}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+                  <span className="flex h-2 w-2 rounded-full bg-slate-300" aria-hidden="true" />
+                  {language === 'hi' ? 'डिफ़ॉल्ट स्थान: जयपुर' : 'Default location: Jaipur'}
+                </div>
+              )}
             </div>
-          )}
-
-          {locationStatus === 'detecting' && (
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-              <div className="w-3 h-3 border-2 border-slate-200 border-t-[#004A99] rounded-full animate-spin" aria-hidden="true" />
-              {language === 'hi' ? 'आपका स्थान पता लगाया जा रहा है...' : 'Detecting your location...'}
-            </div>
-          )}
+            
+            <button
+              onClick={detectLocation}
+              disabled={locationStatus === 'detecting'}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-[#004A99] text-[#004A99] rounded-lg text-sm font-semibold hover:bg-[#004A99] hover:text-white transition-colors disabled:opacity-50"
+            >
+              {locationStatus === 'detecting' ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-[#004A99] border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+                  {language === 'hi' ? 'पता लगाया जा रहा है...' : 'Detecting...'}
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  {language === 'hi' ? 'मेरा स्थान खोजें' : 'Detect My Location'}
+                </>
+              )}
+            </button>
+          </div>
 
           {/* Google Maps Embed — dynamically centered on user's location */}
           <section className="space-y-4" aria-label="Map showing nearest polling station">

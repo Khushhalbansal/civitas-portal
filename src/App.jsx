@@ -2,7 +2,7 @@ import React, { Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
-import { logPageView, logAnalyticsEvent } from './services/firebase/firebaseConfig';
+import { logPageView } from './services/firebase/firebaseConfig';
 
 // Lazy-load route-level components for optimal code splitting
 const EligibilityChecker = React.lazy(() => import('./features/eligibility'));
