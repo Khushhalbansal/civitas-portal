@@ -1,7 +1,8 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInAnonymously } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics, logEvent, isSupported } from "firebase/analytics";
+import { getPerformance } from "firebase/performance";
 
 /**
  * Firebase configuration — environment variables loaded via Vite's import.meta.env.
@@ -27,12 +28,20 @@ export const googleProvider = new GoogleAuthProvider();
 // Firebase Cloud Firestore — NoSQL document database for interaction telemetry
 export const db = getFirestore(app);
 
+// Firebase Performance Monitoring — auto-tracks page load, network latency, and custom traces
+let perf = null;
+try {
+  perf = getPerformance(app);
+} catch (e) {
+  console.warn('[Firebase Performance] Initialization skipped:', e.message);
+}
+export { perf };
+
 // Firebase Analytics (Google Analytics 4) — initialized asynchronously
 let analytics = null;
 
 /**
  * Initializes Firebase Analytics if the browser supports it.
- * Returns the analytics instance or null.
  * @returns {Promise<import("firebase/analytics").Analytics|null>}
  */
 export const initAnalytics = async () => {
@@ -74,8 +83,7 @@ export const logPageView = (pagePath, pageTitle) => {
 
 /**
  * Signs the user in anonymously via Firebase Auth.
- * This ensures every session has an auth context without requiring credentials.
- * @returns {Promise<import("firebase/auth").UserCredential>}
+ * @returns {Promise<import("firebase/auth").UserCredential|null>}
  */
 export const signInAnon = async () => {
   try {

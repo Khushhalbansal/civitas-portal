@@ -29,6 +29,10 @@ vi.mock('firebase/analytics', () => ({
   isSupported: vi.fn().mockResolvedValue(true),
 }));
 
+vi.mock('firebase/performance', () => ({
+  getPerformance: vi.fn(() => ({})),
+}));
+
 describe('Firebase Integration Services', () => {
   describe('Firebase Auth', () => {
     it('should export auth, googleProvider, and signInAnon', async () => {
@@ -63,6 +67,13 @@ describe('Firebase Integration Services', () => {
     });
   });
 
+  describe('Firebase Performance Monitoring', () => {
+    it('should export perf instance', async () => {
+      const { perf } = await import('../services/firebase/firebaseConfig');
+      expect(perf).toBeDefined();
+    });
+  });
+
   describe('Firestore Interaction Service', () => {
     it('should export saveAnonymizedInteraction and getInteractionCount', async () => {
       const { saveAnonymizedInteraction, getInteractionCount } = await import('../services/firebase/interactionService');
@@ -82,3 +93,44 @@ describe('Firebase Integration Services', () => {
     });
   });
 });
+
+describe('Geolocation Service', () => {
+  it('should export getUserLocation, reverseGeocode, and buildGoogleMapsEmbedUrl', async () => {
+    const { getUserLocation, reverseGeocode, buildGoogleMapsEmbedUrl } = await import('../services/geolocationService');
+    expect(getUserLocation).toBeInstanceOf(Function);
+    expect(reverseGeocode).toBeInstanceOf(Function);
+    expect(buildGoogleMapsEmbedUrl).toBeInstanceOf(Function);
+  });
+
+  it('buildGoogleMapsEmbedUrl should return a valid Google Maps URL', async () => {
+    const { buildGoogleMapsEmbedUrl } = await import('../services/geolocationService');
+    const url = buildGoogleMapsEmbedUrl(28.6139, 77.2090, 14);
+    expect(url).toContain('google.com/maps');
+    expect(url).toContain('28.6139');
+    expect(url).toContain('77.209');
+    expect(url).toContain('output=embed');
+  });
+
+  it('getUserLocation should return fallback when geolocation is unavailable', async () => {
+    // In jsdom, navigator.geolocation is undefined
+    const { getUserLocation } = await import('../services/geolocationService');
+    const loc = await getUserLocation();
+    expect(loc).toHaveProperty('lat');
+    expect(loc).toHaveProperty('lng');
+    expect(loc).toHaveProperty('city');
+    expect(typeof loc.lat).toBe('number');
+    expect(typeof loc.lng).toBe('number');
+  });
+
+  it('reverseGeocode should return a string', async () => {
+    // Mock fetch for reverse geocoding
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve({ address: { city: 'New Delhi', state: 'Delhi' } }),
+    });
+    const { reverseGeocode } = await import('../services/geolocationService');
+    const city = await reverseGeocode(28.6139, 77.2090);
+    expect(typeof city).toBe('string');
+    expect(city.length).toBeGreaterThan(0);
+  });
+});
+

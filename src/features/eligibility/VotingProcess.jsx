@@ -1,56 +1,76 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import DOMPurify from 'dompurify';
 import { fetchVoterInfo } from '../../services/google/googleCivicAPI';
 import { logAnalyticsEvent } from '../../services/firebase/firebaseConfig';
 import { getInteractionCount } from '../../services/firebase/interactionService';
+import { getUserLocation, reverseGeocode, buildGoogleMapsEmbedUrl } from '../../services/geolocationService';
 
-/**
- * Google Maps embed URL for Jaipur City Center (no API key required).
- * This is a genuine Google Maps Platform integration.
- */
-const GOOGLE_MAPS_EMBED_URL =
-  'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d227748.38!2d75.65!3d26.885!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x396c4adf4c57e281%3A0xce1c63a0cf22e09!2sJaipur%2C%20Rajasthan!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin';
+/** Default fallback for Jaipur */
+const DEFAULT_COORDS = { lat: 26.9124, lng: 75.7873 };
+const DEFAULT_MAP_URL = buildGoogleMapsEmbedUrl(DEFAULT_COORDS.lat, DEFAULT_COORDS.lng);
 
 /**
  * VotingProcess Component
- * Displays polling station information via Google Maps embed,
- * civic data from the Gemini-powered Civic API, and Firestore read statistics.
+ * Detects user's location via browser Geolocation API, displays their area
+ * on Google Maps, and fetches location-specific civic information via Gemini.
  *
- * @param {Object} props
- * @param {string} props.language - Current language code ('en' | 'hi')
- * @param {string} [props.dynamicFaqAnswer] - Optional AI-generated FAQ answer
+ * @param {{ language: string, dynamicFaqAnswer?: string }} props
  */
 export const VotingProcess = ({ language, dynamicFaqAnswer = '' }) => {
   const [civicInfo, setCivicInfo] = useState(null);
   const [loadingCivic, setLoadingCivic] = useState(true);
   const [citizenCount, setCitizenCount] = useState(0);
+  const [mapUrl, setMapUrl] = useState(DEFAULT_MAP_URL);
+  const [detectedCity, setDetectedCity] = useState('');
+  const [locationStatus, setLocationStatus] = useState('detecting'); // 'detecting' | 'granted' | 'denied'
 
-  // Prevent XSS from LLM generated FAQ answers
   const sanitizedFaqAnswer = DOMPurify.sanitize(dynamicFaqAnswer);
 
-  // Fetch civic information on mount
+  // Step 1: Detect user location and set up Google Maps
   useEffect(() => {
     let cancelled = false;
-    const loadCivicInfo = async () => {
+    const detectLocation = async () => {
+      setLocationStatus('detecting');
+      const loc = await getUserLocation();
+
+      if (cancelled) return;
+
+      // Build the dynamic Google Maps URL centered on user's position
+      setMapUrl(buildGoogleMapsEmbedUrl(loc.lat, loc.lng));
+
+      // Reverse geocode to get city name
+      let city = loc.city;
+      if (!city) {
+        city = await reverseGeocode(loc.lat, loc.lng);
+      }
+
+      if (cancelled) return;
+      setDetectedCity(city);
+      setLocationStatus(city === 'Jaipur' && loc.lat === DEFAULT_COORDS.lat ? 'denied' : 'granted');
+
+      logAnalyticsEvent('location_detected', { city: city, status: 'success' });
+
+      // Step 2: Fetch civic info for the detected city
       setLoadingCivic(true);
       try {
-        const info = await fetchVoterInfo('Jaipur');
+        const info = await fetchVoterInfo(city);
         if (!cancelled) {
           setCivicInfo(info);
-          logAnalyticsEvent('civic_info_loaded', { location: 'Jaipur', status: 'success' });
+          logAnalyticsEvent('civic_info_loaded', { location: city, status: 'success' });
         }
       } catch (error) {
         console.error('[VotingProcess] Failed to load civic info:', error);
-        logAnalyticsEvent('civic_info_loaded', { location: 'Jaipur', status: 'error' });
+        logAnalyticsEvent('civic_info_loaded', { location: city, status: 'error' });
       } finally {
         if (!cancelled) setLoadingCivic(false);
       }
     };
-    loadCivicInfo();
+
+    detectLocation();
     return () => { cancelled = true; };
   }, []);
 
-  // Read interaction count from Firestore (demonstrates active Firestore READ)
+  // Read interaction count from Firestore
   useEffect(() => {
     getInteractionCount().then((count) => setCitizenCount(count));
   }, []);
@@ -88,27 +108,46 @@ export const VotingProcess = ({ language, dynamicFaqAnswer = '' }) => {
                 <p className="text-sm font-semibold text-[#004A99]">
                   {citizenCount.toLocaleString()} {language === 'hi' ? 'नागरिकों ने जांच की' : 'citizens checked eligibility'}
                 </p>
-                <p className="text-xs text-slate-500">{language === 'hi' ? 'फायरस्टोर डेटा से' : 'Live data from Firestore'}</p>
+                <p className="text-xs text-slate-500">{language === 'hi' ? 'फायरस्टोर लाइव डेटा' : 'Live data from Firestore'}</p>
               </div>
             </div>
           )}
 
-          {/* Google Maps Embed — genuine Google Maps Platform integration */}
+          {/* Location Status Badge */}
+          {detectedCity && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className={`flex h-2 w-2 rounded-full ${locationStatus === 'granted' ? 'bg-emerald-500' : 'bg-amber-500'}`} aria-hidden="true" />
+              <span className="text-slate-600">
+                {locationStatus === 'granted'
+                  ? (language === 'hi' ? `📍 स्थान पता चला: ${detectedCity}` : `📍 Location detected: ${detectedCity}`)
+                  : (language === 'hi' ? `📍 डिफ़ॉल्ट स्थान: ${detectedCity}` : `📍 Default location: ${detectedCity}`)}
+              </span>
+            </div>
+          )}
+
+          {locationStatus === 'detecting' && (
+            <div className="flex items-center gap-2 text-sm text-slate-400">
+              <div className="w-3 h-3 border-2 border-slate-200 border-t-[#004A99] rounded-full animate-spin" aria-hidden="true" />
+              {language === 'hi' ? 'आपका स्थान पता लगाया जा रहा है...' : 'Detecting your location...'}
+            </div>
+          )}
+
+          {/* Google Maps Embed — dynamically centered on user's location */}
           <section className="space-y-4" aria-label="Map showing nearest polling station">
             <h3 className="font-semibold text-slate-800 text-lg">
               {language === 'hi' ? 'आपका मतदान केंद्र' : 'Your Polling Station'}
             </h3>
-            <div className="w-full bg-slate-50 rounded-xl border border-slate-200 overflow-hidden relative h-64">
+            <div className="w-full bg-slate-50 rounded-xl border border-slate-200 overflow-hidden relative h-72">
               <iframe
-                src={GOOGLE_MAPS_EMBED_URL}
+                src={mapUrl}
                 width="100%"
                 height="100%"
                 style={{ border: 0 }}
                 allowFullScreen=""
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
-                title="Google Maps - Jaipur Polling Station"
-                aria-label="Google Maps showing Jaipur polling station location"
+                title={`Google Maps - ${detectedCity || 'Polling Station'}`}
+                aria-label={`Google Maps showing polling station near ${detectedCity || 'your location'}`}
               />
             </div>
           </section>
@@ -121,6 +160,7 @@ export const VotingProcess = ({ language, dynamicFaqAnswer = '' }) => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 {language === 'hi' ? 'मतदान केंद्र विवरण' : 'Polling Station Details'}
+                {detectedCity && <span className="text-sm font-normal text-slate-500">— {detectedCity}</span>}
               </h3>
               <div className="bg-slate-50 rounded-xl border border-slate-200 divide-y divide-slate-100">
                 <div className="p-4 flex justify-between items-center">
