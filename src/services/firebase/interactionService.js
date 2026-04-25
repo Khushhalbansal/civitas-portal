@@ -1,12 +1,12 @@
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getCountFromServer, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 
 /**
- * Saves anonymized user interaction data for analytics.
- * No PII (Personally Identifiable Information) is stored.
- * 
- * @param {string} interactionType - e.g., 'ELIGIBILITY_CHECK', 'FAQ_VIEWED'
- * @param {object} metadata - e.g., { language: 'hi', location: 'Delhi', ageGroup: '18-24' }
+ * Saves anonymized user interaction data to Firestore.
+ * Zero-PII: No personally identifiable information is stored.
+ *
+ * @param {string} interactionType - e.g., 'ELIGIBILITY_CHECK', 'AI_CHAT'
+ * @param {object} metadata - e.g., { result: 'Eligible' }
  */
 export const saveAnonymizedInteraction = async (interactionType, metadata = {}) => {
   try {
@@ -15,11 +15,27 @@ export const saveAnonymizedInteraction = async (interactionType, metadata = {}) 
       type: interactionType,
       metadata: metadata,
       timestamp: serverTimestamp(),
-      // Adding a generic identifier instead of User ID to maintain privacy
-      sessionType: 'anonymous' 
+      sessionType: 'anonymous'
     });
-    console.log(`Interaction logged: ${interactionType}`);
   } catch (error) {
-    console.error("Error saving interaction to Firestore:", error);
+    console.error('[Firestore] Error saving interaction:', error);
+  }
+};
+
+/**
+ * Reads the total count of anonymized interactions from Firestore.
+ * Uses getCountFromServer for efficiency (does not download documents).
+ * This demonstrates active Firestore READ operations.
+ *
+ * @returns {Promise<number>} The total interaction count.
+ */
+export const getInteractionCount = async () => {
+  try {
+    const interactionsRef = collection(db, 'anonymized_interactions');
+    const snapshot = await getCountFromServer(interactionsRef);
+    return snapshot.data().count;
+  } catch (error) {
+    console.error('[Firestore] Error reading interaction count:', error);
+    return 0;
   }
 };

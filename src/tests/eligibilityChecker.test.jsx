@@ -4,15 +4,20 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { EligibilityChecker } from '../features/eligibility';
 import { MemoryRouter } from 'react-router-dom';
 
-// Mock firebase to avoid initialization in test environment
+// Mock all Firebase services to avoid initialization in test environment
 vi.mock('../services/firebase/firebaseConfig', () => ({
   auth: {},
   db: {},
+  googleProvider: {},
   logAnalyticsEvent: vi.fn(),
+  logPageView: vi.fn(),
+  initAnalytics: vi.fn().mockResolvedValue(null),
+  signInAnon: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('../services/firebase/interactionService', () => ({
   saveAnonymizedInteraction: vi.fn(),
+  getInteractionCount: vi.fn().mockResolvedValue(42),
 }));
 
 describe('EligibilityChecker Component', () => {

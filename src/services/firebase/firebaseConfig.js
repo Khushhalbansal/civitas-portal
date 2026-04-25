@@ -1,11 +1,11 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics, logEvent, isSupported } from "firebase/analytics";
 
 /**
- * Firebase configuration — all keys loaded from environment variables
- * to prevent hardcoded credentials in the source code.
+ * Firebase configuration — environment variables loaded via Vite's import.meta.env.
+ * Keys are restricted by domain in the Firebase Console.
  */
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -17,28 +17,72 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-// Initialize Firebase
+// Initialize Firebase App
 const app = initializeApp(firebaseConfig);
+
+// Firebase Authentication — supports Anonymous + Google sign-in
 export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
+
+// Firebase Cloud Firestore — NoSQL document database for interaction telemetry
 export const db = getFirestore(app);
 
-// Initialize Firebase Analytics (Google Analytics 4)
-// Uses isSupported() to gracefully handle environments without analytics (e.g., SSR, tests)
+// Firebase Analytics (Google Analytics 4) — initialized asynchronously
 let analytics = null;
-isSupported().then((supported) => {
+
+/**
+ * Initializes Firebase Analytics if the browser supports it.
+ * Returns the analytics instance or null.
+ * @returns {Promise<import("firebase/analytics").Analytics|null>}
+ */
+export const initAnalytics = async () => {
+  if (analytics) return analytics;
+  const supported = await isSupported();
   if (supported) {
     analytics = getAnalytics(app);
   }
-});
+  return analytics;
+};
+
+// Auto-initialize analytics on module load
+initAnalytics();
 
 /**
- * Logs a custom analytics event to Google Analytics 4 via Firebase.
- * Events are anonymized — no PII is ever attached.
- * @param {string} eventName - GA4 event name (e.g., 'eligibility_check', 'ai_chat_message')
- * @param {Object} [params={}] - Event parameters (must not contain PII)
+ * Logs a custom event to Google Analytics 4. Zero-PII by design.
+ * @param {string} eventName - e.g., 'eligibility_check', 'page_view'
+ * @param {Object} [params={}] - Event parameters (must never contain PII)
  */
 export const logAnalyticsEvent = (eventName, params = {}) => {
   if (analytics) {
     logEvent(analytics, eventName, params);
+  }
+};
+
+/**
+ * Tracks a page/screen view in GA4.
+ * @param {string} pagePath - The route path, e.g., '/chat'
+ * @param {string} pageTitle - Human-readable title, e.g., 'AI Chat'
+ */
+export const logPageView = (pagePath, pageTitle) => {
+  if (analytics) {
+    logEvent(analytics, 'page_view', {
+      page_path: pagePath,
+      page_title: pageTitle,
+    });
+  }
+};
+
+/**
+ * Signs the user in anonymously via Firebase Auth.
+ * This ensures every session has an auth context without requiring credentials.
+ * @returns {Promise<import("firebase/auth").UserCredential>}
+ */
+export const signInAnon = async () => {
+  try {
+    const cred = await signInAnonymously(auth);
+    return cred;
+  } catch (error) {
+    console.warn('[Firebase Auth] Anonymous sign-in failed:', error.code);
+    return null;
   }
 };
