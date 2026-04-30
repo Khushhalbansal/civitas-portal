@@ -29,6 +29,15 @@ describe('Google Translate API Service', () => {
     );
   });
 
+  it('should call Gemini with English translation prompt', async () => {
+    generateGeminiResponse.mockResolvedValueOnce('Hello World');
+    const result = await translateText('नमस्ते दुनिया', 'en');
+    expect(result).toBe('Hello World');
+    expect(generateGeminiResponse).toHaveBeenCalledWith(
+      expect.stringContaining('English')
+    );
+  });
+
   it('should return original text on API failure', async () => {
     generateGeminiResponse.mockRejectedValueOnce(new Error('API error'));
     const result = await translateText('Hello', 'hi');

@@ -41,4 +41,21 @@ describe('ErrorBoundary Component', () => {
     );
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
+
+  it('should call window.location.reload when reload button is clicked', () => {
+    const originalLocation = window.location;
+    delete window.location;
+    window.location = { reload: vi.fn() };
+
+    render(
+      <ErrorBoundary>
+        <ThrowingChild />
+      </ErrorBoundary>
+    );
+    const reloadBtn = screen.getByRole('button', { name: /reload/i });
+    reloadBtn.click();
+    expect(window.location.reload).toHaveBeenCalled();
+
+    window.location = originalLocation;
+  });
 });

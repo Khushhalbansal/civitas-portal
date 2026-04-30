@@ -54,6 +54,14 @@ describe('Firebase Integration Services', () => {
       const result = await signInAnon();
       expect(result).toBeDefined();
     });
+
+    it('signInAnon should handle errors gracefully', async () => {
+      const { signInAnonymously } = await import('firebase/auth');
+      signInAnonymously.mockRejectedValueOnce(new Error('Auth failed'));
+      const { signInAnon } = await import('../services/firebase/firebaseConfig');
+      const result = await signInAnon();
+      expect(result).toBeNull();
+    });
   });
 
   describe('Firebase Analytics', () => {
@@ -79,6 +87,17 @@ describe('Firebase Integration Services', () => {
       const { perf } = await import('../services/firebase/firebaseConfig');
       expect(perf).toBeDefined();
     });
+
+    it('should handle getPerformance error gracefully', async () => {
+      const { getPerformance } = await import('firebase/performance');
+      getPerformance.mockImplementationOnce(() => {
+        throw new Error('Perf not supported');
+      });
+      // We must isolate module to trigger initialization again
+      vi.resetModules();
+      const { perf } = await import('../services/firebase/firebaseConfig');
+      expect(perf).toBeNull();
+    });
   });
 
   describe('Firestore Interaction Service', () => {
@@ -95,6 +114,21 @@ describe('Firebase Integration Services', () => {
     });
 
     it('saveAnonymizedInteraction should not throw', async () => {
+      const { saveAnonymizedInteraction } = await import('../services/firebase/interactionService');
+      await expect(saveAnonymizedInteraction('TEST', { foo: 'bar' })).resolves.not.toThrow();
+    });
+
+    it('getInteractionCount should handle errors gracefully', async () => {
+      const { getCountFromServer } = await import('firebase/firestore');
+      getCountFromServer.mockRejectedValueOnce(new Error('Firebase error'));
+      const { getInteractionCount } = await import('../services/firebase/interactionService');
+      const count = await getInteractionCount();
+      expect(count).toBe(0);
+    });
+
+    it('saveAnonymizedInteraction should handle errors gracefully', async () => {
+      const { addDoc } = await import('firebase/firestore');
+      addDoc.mockRejectedValueOnce(new Error('Firebase error'));
       const { saveAnonymizedInteraction } = await import('../services/firebase/interactionService');
       await expect(saveAnonymizedInteraction('TEST', { foo: 'bar' })).resolves.not.toThrow();
     });
@@ -137,7 +171,50 @@ describe('Geolocation Service', () => {
     const { reverseGeocode } = await import('../services/geolocationService');
     const city = await reverseGeocode(28.6139, 77.2090);
     expect(typeof city).toBe('string');
-    expect(city.length).toBeGreaterThan(0);
+    expect(city).toBe('New Delhi');
+  });
+
+  it('reverseGeocode should fallback to town or village', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve({ address: { town: 'Small Town' } }),
+    });
+    const { reverseGeocode } = await import('../services/geolocationService');
+    const city = await reverseGeocode(28.6139, 77.2090);
+    expect(city).toBe('Small Town');
+  });
+
+  it('reverseGeocode should return fallback on fetch error', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+    const { reverseGeocode } = await import('../services/geolocationService');
+    const city = await reverseGeocode(28.6139, 77.2090);
+    expect(city).toBe('Your Area');
+  });
+
+  it('getUserLocation should return coords when geolocation succeeds', async () => {
+    const originalGeolocation = globalThis.navigator.geolocation;
+    globalThis.navigator.geolocation = {
+      getCurrentPosition: vi.fn((success) => {
+        success({ coords: { latitude: 10, longitude: 20 } });
+      })
+    };
+    const { getUserLocation } = await import('../services/geolocationService');
+    const loc = await getUserLocation();
+    expect(loc.lat).toBe(10);
+    expect(loc.lng).toBe(20);
+    globalThis.navigator.geolocation = originalGeolocation;
+  });
+
+  it('getUserLocation should return fallback when geolocation fails', async () => {
+    const originalGeolocation = globalThis.navigator.geolocation;
+    globalThis.navigator.geolocation = {
+      getCurrentPosition: vi.fn((_, error) => {
+        error({ message: 'User denied Geolocation' });
+      })
+    };
+    const { getUserLocation } = await import('../services/geolocationService');
+    const loc = await getUserLocation();
+    expect(loc.city).toBe('Jaipur');
+    globalThis.navigator.geolocation = originalGeolocation;
   });
 });
 

@@ -124,5 +124,49 @@ describe('EligibilityChecker Component', () => {
       fireEvent.click(screen.getByRole('button', { name: /verify eligibility/i }));
       expect(screen.getByText('You are eligible to vote.')).toBeInTheDocument();
     });
+
+    it('should show ineligible message for age under 18', () => {
+      renderComponent();
+      const ageInput = screen.getByLabelText(/age/i);
+      fireEvent.change(ageInput, { target: { value: '15' } });
+      fireEvent.click(screen.getByRole('button', { name: /verify eligibility/i }));
+      expect(screen.getByText(/You must be 18 or older to vote/i)).toBeInTheDocument();
+    });
+
+    it('should show hindi alerts when language is hindi', () => {
+      renderComponent();
+      // Switch to Hindi
+      fireEvent.click(screen.getByRole('button', { name: /switch to hindi/i }));
+      
+      // Empty age
+      fireEvent.click(screen.getByRole('button', { name: /सत्यापित करें/i }));
+      expect(alertMock).toHaveBeenCalledWith('कृपया एक मान्य आयु दर्ज करें।');
+
+      // Invalid age bounds
+      const ageInput = screen.getByLabelText(/आयु/i);
+      fireEvent.change(ageInput, { target: { value: '0' } });
+      fireEvent.click(screen.getByRole('button', { name: /सत्यापित करें/i }));
+      expect(alertMock).toHaveBeenCalledWith('कृपया 1 और 120 के बीच एक मान्य आयु दर्ज करें।');
+    });
+  });
+
+  describe('Interactions', () => {
+    it('should change location on select', () => {
+      renderComponent();
+      const locationSelect = screen.getByLabelText(/location/i);
+      fireEvent.change(locationSelect, { target: { value: 'Mumbai' } });
+      expect(locationSelect.value).toBe('Mumbai');
+    });
+
+    it('should toggle language', () => {
+      renderComponent();
+      const toggleBtn = screen.getByRole('button', { name: /switch to hindi/i });
+      fireEvent.click(toggleBtn);
+      // After click, it should switch to Hindi
+      expect(screen.getByText('पात्रता जांच')).toBeInTheDocument();
+      const toggleBtnEn = screen.getByRole('button', { name: /अंग्रेजी में बदलें/i });
+      fireEvent.click(toggleBtnEn);
+      expect(screen.getByText('Voter Eligibility')).toBeInTheDocument();
+    });
   });
 });

@@ -3,6 +3,7 @@ export const fetchMockElectionDates = async (location) => {
     setTimeout(() => {
       if (!location) {
         reject(new Error("Location is required"));
+        return;
       }
       const mockDb = {
         "delhi": { nextElection: "2025-02-14", type: "Assembly" },
