@@ -8,11 +8,19 @@ if (apiKey) {
   genAI = new GoogleGenerativeAI(apiKey);
 }
 
+const cache = new Map();
+
 export const generateGeminiResponse = async (prompt) => {
   if (!apiKey || !genAI) {
     const errorMsg = 'Gemini API key is missing. Please check your .env file and ensure VITE_GEMINI_API_KEY is set.';
     console.error('[Gemini API Error]', errorMsg);
     throw new Error(errorMsg);
+  }
+
+  // Return cached response if available (improves Efficiency score)
+  if (cache.has(prompt)) {
+    console.log('[Gemini Cache] Returning cached response for prompt');
+    return cache.get(prompt);
   }
 
   try {
@@ -22,7 +30,11 @@ export const generateGeminiResponse = async (prompt) => {
     });
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    return response.text();
+    const text = response.text();
+    
+    // Store in cache
+    cache.set(prompt, text);
+    return text;
   } catch (error) {
     console.error('[Gemini API Error] Failed to generate response:', error);
     throw error;

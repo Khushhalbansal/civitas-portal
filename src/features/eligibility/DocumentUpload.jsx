@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { ref, uploadBytesResumable } from 'firebase/storage';
 import { storage } from '../../services/firebase/firebaseConfig';
 import { useAuth } from '../../context/AuthContext';
@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext';
  *
  * @param {{ language: string }} props
  */
-export const DocumentUpload = ({ language }) => {
+const DocumentUploadComponent = ({ language }) => {
   const [file, setFile] = useState(null);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('idle'); // 'idle' | 'uploading' | 'success' | 'error'
@@ -117,3 +117,5 @@ export const DocumentUpload = ({ language }) => {
     </div>
   );
 };
+
+export const DocumentUpload = React.memo(DocumentUploadComponent);

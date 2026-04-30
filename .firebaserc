@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "voting-e2099"
-  }
+  },
+  "targets": {
+    "voting-e2099": {
+      "hosting": {
+        "v2": [
+          "voting-app-v2-khush"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
