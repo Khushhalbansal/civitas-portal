@@ -4,6 +4,11 @@ import { useElectionState } from '../features/eligibility/useElectionState';
 import * as mockElectionService from '../services/mockElectionService';
 import { saveAnonymizedInteraction } from '../services/firebase/interactionService';
 import { logAnalyticsEvent } from '../services/firebase/firebaseConfig';
+import { getGeminiResponse } from '../services/geminiService';
+
+vi.mock('../services/geminiService', () => ({
+  getGeminiResponse: vi.fn().mockResolvedValue('Mock AI Response: Eligible'),
+}));
 
 vi.mock('../services/firebase/interactionService', () => ({
   saveAnonymizedInteraction: vi.fn(),
@@ -27,11 +32,11 @@ describe('useElectionState', () => {
     vi.clearAllMocks();
   });
 
-  it('should change language and trigger eligibility re-check if age is set', () => {
+  it('should change language and trigger eligibility re-check if age is set', async () => {
     const { result } = renderHook(() => useElectionState());
 
-    act(() => {
-      result.current.checkEligibility(25, 'Delhi');
+    await act(async () => {
+      await result.current.checkEligibility(25, 'Delhi');
     });
 
     expect(result.current.state.eligibility.age).toBe(25);
@@ -49,11 +54,11 @@ describe('useElectionState', () => {
     expect(logAnalyticsEvent).toHaveBeenCalledWith('language_switch', { target_language: 'hi' });
   });
 
-  it('should log ineligible when under 18', () => {
+  it('should log ineligible when under 18', async () => {
     const { result } = renderHook(() => useElectionState());
 
-    act(() => {
-      result.current.checkEligibility(15, 'Delhi');
+    await act(async () => {
+      await result.current.checkEligibility(15, 'Delhi');
     });
 
     expect(saveAnonymizedInteraction).toHaveBeenCalledWith('ELIGIBILITY_CHECK', { result: 'Ineligible' });

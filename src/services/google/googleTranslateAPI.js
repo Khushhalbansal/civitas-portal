@@ -1,4 +1,4 @@
-import { generateGeminiResponse } from '../geminiService';
+import { getGeminiResponse } from '../geminiService';
 
 /**
  * Google Translate Integration via Gemini API
@@ -17,7 +17,7 @@ export const translateText = async (text, targetLanguage) => {
 
   try {
     const prompt = `Translate the following text to ${langName}. Return ONLY the translated text, nothing else:\n\n"${text}"`;
-    const translated = await generateGeminiResponse(prompt);
+    const translated = await getGeminiResponse(prompt);
     return translated.trim().replace(/^["']|["']$/g, ''); // Strip wrapper quotes if any
   } catch (error) {
     console.error('[Google Translate] Translation failed, returning original text:', error);

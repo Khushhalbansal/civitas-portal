@@ -8,6 +8,8 @@ import { logPageView } from './services/firebase/firebaseConfig';
 const EligibilityChecker = React.lazy(() => import('./features/eligibility'));
 const VotingProcess = React.lazy(() => import('./features/eligibility/VotingProcess'));
 const ChatInterface = React.lazy(() => import('./features/chat'));
+const Quiz = React.lazy(() => import('./features/quiz'));
+const ThreeBackground = React.lazy(() => import('./components/ThreeBackground'));
 
 /**
  * Loading fallback displayed while lazy-loaded route components are fetched.
@@ -89,7 +91,12 @@ const AuthButton = () => {
 const AnalyticsTracker = () => {
   const location = useLocation();
   useEffect(() => {
-    const titles = { '/': 'Eligibility', '/process': 'Voting Process', '/chat': 'AI Chat' };
+    const titles = { 
+      '/': 'Eligibility', 
+      '/process': 'Voting Process', 
+      '/chat': 'AI Chat',
+      '/quiz': 'Voter Quiz'
+    };
     logPageView(location.pathname, titles[location.pathname] || 'Unknown');
   }, [location.pathname]);
   return null;
@@ -100,7 +107,12 @@ const AnalyticsTracker = () => {
  * Implements WCAG 2.1 AA landmarks and skip-to-content.
  */
 const Layout = ({ children }) => (
-  <div className="min-h-screen bg-slate-50 flex flex-col font-sans selection:bg-[#004A99]/20">
+  <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans selection:bg-[#004A99]/20 relative">
+    {/* Dynamic Background */}
+    <Suspense fallback={null}>
+      <ThreeBackground />
+    </Suspense>
+
     {/* Skip-to-content link for keyboard/screen-reader users (WCAG 2.4.1) */}
     <a
       href="#main-content"
@@ -109,7 +121,7 @@ const Layout = ({ children }) => (
       Skip to main content
     </a>
 
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm backdrop-blur-md bg-white/90" role="banner">
+    <header className="bg-white/80 border-b border-slate-200 sticky top-0 z-10 shadow-sm backdrop-blur-md" role="banner">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20 items-center">
           <div className="flex-shrink-0 flex items-center gap-3">
@@ -130,6 +142,7 @@ const Layout = ({ children }) => (
               <NavLink to="/">Eligibility</NavLink>
               <NavLink to="/process">Voting Process</NavLink>
               <NavLink to="/chat">AI Chat</NavLink>
+              <NavLink to="/quiz">Quiz</NavLink>
             </nav>
             <AuthButton />
           </div>
@@ -141,7 +154,7 @@ const Layout = ({ children }) => (
       {children}
     </main>
 
-    <footer className="bg-white border-t border-slate-200 mt-auto" role="contentinfo">
+    <footer className="bg-white/80 border-t border-slate-200 mt-auto backdrop-blur-md" role="contentinfo">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
@@ -169,8 +182,9 @@ const AppContent = () => {
         <Routes>
           <Route path="/" element={<EligibilityChecker />} />
           <Route path="/process" element={<VotingProcess language="en" dynamicFaqAnswer="" />} />
+          <Route path="/quiz" element={<Quiz />} />
           <Route path="/chat" element={
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="bg-white/90 p-8 rounded-2xl shadow-sm border border-slate-200 backdrop-blur-sm">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-[#004A99]/10 flex items-center justify-center">
                   <svg className="w-5 h-5 text-[#004A99]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -179,7 +193,7 @@ const AppContent = () => {
                 </div>
                 <h2 className="text-2xl font-bold text-slate-800">AI Assistant</h2>
               </div>
-              <div className="bg-slate-50 rounded-xl border border-slate-100 p-4">
+              <div className="bg-slate-50/50 rounded-xl border border-slate-100 p-4">
                 <ChatInterface aiMessage="<p>Hello! I am your <strong>non-partisan</strong> election assistant. How can I help you today?</p>" />
               </div>
             </div>
@@ -189,6 +203,7 @@ const AppContent = () => {
     </Layout>
   );
 };
+
 
 /**
  * App — Root component. Wraps the app with ErrorBoundary, AuthProvider, and Router.

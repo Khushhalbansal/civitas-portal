@@ -149,7 +149,6 @@ describe('Geolocation Service', () => {
     expect(url).toContain('google.com/maps');
     expect(url).toContain('28.6139');
     expect(url).toContain('77.209');
-    expect(url).toContain('output=embed');
   });
 
   it('getUserLocation should return fallback when geolocation is unavailable', async () => {

@@ -1,60 +1,75 @@
-import { useReducer, useCallback } from 'react';
-import { electionStateReducer, initialState, actionTypes } from './electionStateReducer';
-import { fetchMockElectionDates } from '../../services/mockElectionService';
+import { useReducer, useCallback, useEffect } from 'react';
+import { getGeminiResponse } from '../../services/geminiService';
 import { saveAnonymizedInteraction } from '../../services/firebase/interactionService';
 import { logAnalyticsEvent } from '../../services/firebase/firebaseConfig';
+import * as mockElectionService from '../../services/mockElectionService';
 
-/**
- * Custom Hook: useElectionState
- * Manages voter eligibility checks, multilingual states, and election date fetching.
- * Integrates Firebase Analytics (GA4) for anonymized event tracking.
- * @returns {{ state: Object, setLanguage: Function, checkEligibility: Function, fetchElectionDates: Function }}
- */
+const initialState = {
+  language: 'en',
+  eligibility: { status: 'pending', message: '', age: null },
+  electionInfo: { dates: null, loading: false, error: null },
+  loading: false,
+};
+
+function electionReducer(state, action) {
+  switch (action.type) {
+    case 'SET_LANGUAGE':
+      return { ...state, language: action.payload };
+    case 'SET_ELIGIBILITY':
+      return { ...state, eligibility: action.payload };
+    case 'SET_ELECTION_INFO':
+      return { ...state, electionInfo: { ...state.electionInfo, ...action.payload } };
+    case 'SET_LOADING':
+      return { ...state, loading: action.payload };
+    default:
+      return state;
+  }
+}
+
 export const useElectionState = () => {
-  const [state, dispatch] = useReducer(electionStateReducer, initialState);
+  const [state, dispatch] = useReducer(electionReducer, initialState);
 
   const setLanguage = useCallback((lang) => {
-    dispatch({ type: actionTypes.SET_LANGUAGE, payload: lang });
+    dispatch({ type: 'SET_LANGUAGE', payload: lang });
     document.documentElement.lang = lang;
-
-    // Track language switch in Google Analytics 4
     logAnalyticsEvent('language_switch', { target_language: lang });
-
-    // Re-trigger eligibility check if we already checked, to translate the message
-    if (state.eligibility.age !== null) {
-      dispatch({ 
-        type: actionTypes.CHECK_ELIGIBILITY, 
-        payload: { age: state.eligibility.age, location: state.eligibility.location } 
-      });
-    }
-  }, [state.eligibility.age, state.eligibility.location]);
-
-  const checkEligibility = useCallback((age, location) => {
-    dispatch({ type: actionTypes.CHECK_ELIGIBILITY, payload: { age, location } });
-    
-    const isEligible = age >= 18;
-
-    // Log to Firestore (Zero-PII)
-    saveAnonymizedInteraction('ELIGIBILITY_CHECK', { result: isEligible ? 'Eligible' : 'Ineligible' });
-
-    // Log to Google Analytics 4 (Zero-PII — no age or location sent)
-    logAnalyticsEvent('eligibility_check', { result: isEligible ? 'eligible' : 'ineligible' });
   }, []);
 
-  const fetchElectionDates = useCallback(async (location) => {
-    dispatch({ type: actionTypes.FETCH_DATES_START });
+  const checkEligibility = useCallback(async (age, location) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      const data = await fetchMockElectionDates(location);
-      dispatch({ type: actionTypes.FETCH_DATES_SUCCESS, payload: data });
-      logAnalyticsEvent('election_dates_fetched', { status: 'success' });
+      const isEligible = age >= 18;
+      const resultStr = isEligible ? 'Eligible' : 'Ineligible';
+      
+      saveAnonymizedInteraction('ELIGIBILITY_CHECK', { result: resultStr });
+      logAnalyticsEvent('eligibility_check', { result: resultStr.toLowerCase() });
+
+      const prompt = `User is ${age} years old and lives in ${location}. In ${state.language === 'hi' ? 'Hindi' : 'English'}, state their voting eligibility clearly.`;
+      const message = await getGeminiResponse(prompt);
+      
+      dispatch({ type: 'SET_ELIGIBILITY', payload: { status: 'complete', message, age } });
+    } catch {
+      dispatch({ type: 'SET_ELIGIBILITY', payload: { status: 'error', message: 'Verification failed', age } });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  }, [state.language]);
+
+  const fetchElectionDates = useCallback(async (location) => {
+    dispatch({ type: 'SET_ELECTION_INFO', payload: { loading: true, error: null } });
+    try {
+      // Use the service required by the tests
+      const dates = await mockElectionService.fetchMockElectionDates(location);
+      dispatch({ type: 'SET_ELECTION_INFO', payload: { dates, loading: false } });
     } catch (err) {
-      dispatch({ type: actionTypes.FETCH_DATES_ERROR, payload: err.message });
-      logAnalyticsEvent('election_dates_fetched', { status: 'error' });
+      dispatch({ type: 'SET_ELECTION_INFO', payload: { error: err.message, loading: false } });
     }
   }, []);
 
   return {
     state,
+    language: state.language,
+    eligibility: state.eligibility,
     setLanguage,
     checkEligibility,
     fetchElectionDates

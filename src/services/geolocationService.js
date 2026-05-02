@@ -1,17 +1,24 @@
 /**
- * Geolocation Service
- * Uses the browser's Geolocation API to detect the user's current position.
- * Falls back to a default location (Jaipur) if permission is denied or unavailable.
- *
- * @returns {Promise<{ lat: number, lng: number, city: string }>}
+ * @fileoverview Geolocation Service
+ * Provides secure user location detection using the browser's Geolocation API.
+ * Includes fallback mechanisms and detailed error handling for civic context.
+ * @version 1.2.0
+ */
+
+/** Default coordinates for Jaipur */
+const DEFAULT_LOC = { lat: 26.9124, lng: 75.7873, city: 'Jaipur' };
+
+/**
+ * Retrieves the user's current latitude and longitude.
+ * Includes logic to handle permission denials and timeout scenarios with fallbacks.
+ * 
+ * @returns {Promise<{lat: number, lng: number, city: string}>} User coordinates.
  */
 export const getUserLocation = () => {
   return new Promise((resolve) => {
-    // Default fallback: Jaipur, Rajasthan
-    const fallback = { lat: 26.9124, lng: 75.7873, city: 'Jaipur' };
-
     if (!navigator.geolocation) {
-      resolve(fallback);
+      console.warn('Geolocation unsupported, using fallback');
+      resolve(DEFAULT_LOC);
       return;
     }
 
@@ -20,55 +27,47 @@ export const getUserLocation = () => {
         resolve({
           lat: position.coords.latitude,
           lng: position.coords.longitude,
-          city: '' // City name will be resolved via reverse geocoding
+          city: '' // City will be filled by reverse geocoding
         });
       },
       (error) => {
-        // Permission denied or error — use fallback
-        console.warn('[Geolocation] Denied or error:', error.message);
-        resolve(fallback);
+        console.error('[Geolocation Error]', error.message);
+        resolve(DEFAULT_LOC); // Resolve with fallback instead of rejecting to keep app functional
       },
-      { timeout: 15000, maximumAge: 300000, enableHighAccuracy: false }
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
   });
 };
 
 /**
- * Reverse geocodes coordinates to a city name using Google Maps Geocoding
- * via a free Nominatim endpoint (OpenStreetMap) as a fallback,
- * or extracts city from the Gemini civic response.
- *
+ * Reverse geocodes coordinates to a city name using OpenStreetMap Nominatim.
+ * 
  * @param {number} lat - Latitude
  * @param {number} lng - Longitude
- * @returns {Promise<string>} - City name
+ * @returns {Promise<string>} City name or 'Your Area' fallback.
  */
 export const reverseGeocode = async (lat, lng) => {
   try {
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en`
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10`
     );
     const data = await response.json();
-    // Extract city from the response hierarchy
-    return data.address?.city
-      || data.address?.town
-      || data.address?.village
-      || data.address?.state_district
-      || data.address?.state
-      || 'Your Area';
-  } catch {
+    return data.address?.city || data.address?.town || data.address?.village || 'Your Area';
+  } catch (error) {
+    console.error('[Reverse Geocode Error]', error);
     return 'Your Area';
   }
 };
 
 /**
- * Builds a Google Maps embed URL centered on the given coordinates.
- * Uses the no-API-key embed format.
- *
+ * Builds a Google Maps Embed URL for a given location.
+ * 
  * @param {number} lat - Latitude
  * @param {number} lng - Longitude
- * @param {number} [zoom=14] - Zoom level
- * @returns {string} - Google Maps embed URL
+ * @param {number} zoom - Zoom level (default 12)
+ * @returns {string} The embed URL.
  */
-export const buildGoogleMapsEmbedUrl = (lat, lng, zoom = 14) => {
-  return `https://www.google.com/maps?q=${lat},${lng}&z=${zoom}&output=embed`;
+export const buildGoogleMapsEmbedUrl = (lat, lng, zoom = 12) => {
+  const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  return `https://www.google.com/maps/embed/v1/view?key=${API_KEY}&center=${lat},${lng}&zoom=${zoom}`;
 };

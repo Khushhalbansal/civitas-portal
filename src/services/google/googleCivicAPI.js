@@ -1,44 +1,42 @@
-import { generateGeminiResponse } from '../geminiService';
+/**
+ * @fileoverview Google Civic Information API Service
+ * Handles integration with the Google Civic Info API to fetch representative 
+ * and polling station data based on user address.
+ * @version 1.0.1
+ */
+
+const CIVIC_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY; // Reusing maps key as it usually has civic scope
+const BASE_URL = 'https://www.googleapis.com/civicinfo/v2';
 
 /**
- * Google Civic Information API Integration Service
- * Uses Gemini AI as a civic information engine to provide voters with
- * accurate, non-partisan information about polling locations, voter
- * registration, and election procedures for Indian constituencies.
- *
- * @param {string} location - The voter's city/state (e.g., 'Delhi', 'Mumbai')
- * @returns {Promise<Object>} - Civic information object with polling and registration data
+ * Fetches voter information including representatives and polling locations.
+ * 
+ * @param {string} address - The user's residential address.
+ * @returns {Promise<Object>} The raw civic data from Google.
  */
-export const fetchVoterInfo = async (location) => {
-  if (!location || !location.trim()) {
-    throw new Error('Location is required to fetch voter information.');
-  }
-
+export const getVoterInfo = async (address) => {
   try {
-    const prompt = `You are a factual Indian election information system. For the location "${location}", return ONLY a valid JSON object (no markdown, no code fences) with these fields:
-{
-  "pollingStationName": "name of a real polling station in ${location}",
-  "address": "full address of the polling station",
-  "timings": "voting hours (e.g., 7:00 AM - 6:00 PM)",
-  "documentsRequired": ["list", "of", "required", "documents"],
-  "helplineNumber": "local election helpline number",
-  "registrationDeadline": "next registration deadline date"
-}`;
+    if (!CIVIC_API_KEY) {
+      throw new Error('Civic API Key missing');
+    }
 
-    const response = await generateGeminiResponse(prompt);
-    // Parse the JSON response, stripping any markdown code fences
-    const cleanJson = response.replace(/```json\n?|\n?```/g, '').trim();
-    return JSON.parse(cleanJson);
+    const response = await fetch(
+      `${BASE_URL}/voterinfo?key=${CIVIC_API_KEY}&address=${encodeURIComponent(address)}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Civic API returned status ${response.status}`);
+    }
+
+    return await response.json();
   } catch (error) {
-    console.error('[Civic API] Failed to fetch voter info:', error);
-    // Return structured fallback data so the UI never breaks
+    console.error('[Civic API Error]', error);
+    // Return mock fallback for hackathon demonstration if API fails
     return {
-      pollingStationName: `${location} Municipal Polling Station`,
-      address: `Contact your local Election Commission for the exact address in ${location}.`,
-      timings: '7:00 AM - 6:00 PM',
-      documentsRequired: ['Voter ID (EPIC)', 'Aadhaar Card', 'Passport', 'Driving License'],
-      helplineNumber: '1950 (National Voter Helpline)',
-      registrationDeadline: 'Visit nvsp.in for current deadlines'
+      status: 'mock',
+      pollingLocations: [
+        { address: { locationName: 'Local Community Center (Fallback)', line1: '123 Civic Ave' } }
+      ]
     };
   }
 };

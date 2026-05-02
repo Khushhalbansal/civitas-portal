@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import DOMPurify from 'dompurify';
-import { fetchVoterInfo } from '../../services/google/googleCivicAPI';
+import { getVoterInfo } from '../../services/google/googleCivicAPI';
 import { logAnalyticsEvent } from '../../services/firebase/firebaseConfig';
 import { getInteractionCount } from '../../services/firebase/interactionService';
 import { getUserLocation, reverseGeocode, buildGoogleMapsEmbedUrl } from '../../services/geolocationService';
@@ -48,7 +48,7 @@ export const VotingProcess = ({ language, dynamicFaqAnswer = '' }) => {
     // Step 2: Fetch civic info for the detected city
     setLoadingCivic(true);
     try {
-      const info = await fetchVoterInfo(city);
+      const info = await getVoterInfo(city);
       setCivicInfo(info);
       logAnalyticsEvent('civic_info_loaded', { location: city, status: 'success' });
     } catch (error) {
@@ -65,7 +65,7 @@ export const VotingProcess = ({ language, dynamicFaqAnswer = '' }) => {
     const loadDefault = async () => {
       setLoadingCivic(true);
       try {
-        const info = await fetchVoterInfo('Jaipur');
+        const info = await getVoterInfo('Jaipur');
         if (!cancelled) setCivicInfo(info);
       } catch (e) {
         console.error(e);
