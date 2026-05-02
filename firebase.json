@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "target": "v2",
+    "site": "voting-final-khush",
     "public": "dist",
     "ignore": [
       "firebase.json",
